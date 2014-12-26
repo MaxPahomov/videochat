@@ -8,16 +8,13 @@
     #remoteVideo { height: 70%; margin-top: 5%; background: #111; }
     #localVideo { width: 20%; position: absolute; right: 1.1em; bottom: 1em; border: 1px solid #333; background: #111; }
     #callButton { position: absolute; display: none; left: 50%; font-size: 2em; bottom: 5%; border-radius: 1em; }
-	#btnHangup { position: absolute; display: none; left: 60%; font-size: 2em; color: #F00; bottom: 5%; border-radius: 1em; }
   </style>
-  <title>Видеочат</title>
 </head>
 <script src="/socket.io/socket.io.js"></script>
 
 <video id="localVideo" autoplay muted></video>
 <video id="remoteVideo" autoplay></video>
 <button id="callButton" onclick="createOffer()">✆</button>
-<button id="btnHangup" onclick="btnHangupClick()">✆</button>
 
 <script>
 var PeerConnection = window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
@@ -26,7 +23,7 @@ var SessionDescription = window.mozRTCSessionDescription || window.RTCSessionDes
 navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia;
 
 var pc; // PeerConnection
-var localStream = null;
+
 var servers = { "iceServers": 
 [{url:'stun:stun01.sipphone.com'},
 {url:'stun:stun.ekiga.net'},
@@ -73,11 +70,9 @@ navigator.getUserMedia(
 
 function gotStream(stream) {
   document.getElementById("callButton").style.display = 'inline-block';
-  document.getElementById("btnHangup").style.display = 'inline-block';
   document.getElementById("localVideo").src = URL.createObjectURL(stream);
 
-  localStream = stream;
-  pc = new PeerConnection(null);
+  pc = new PeerConnection(servers);
   pc.addStream(stream);
   pc.onicecandidate = gotIceCandidate;
   pc.onaddstream = gotRemoteStream;
@@ -86,7 +81,6 @@ function gotStream(stream) {
 
 // Step 2. createOffer
 function createOffer() {
-	document.getElementById("localVideo").src = URL.createObjectURL(stream);
   pc.createOffer(
     gotLocalDescription, 
     function(error) { console.log(error) }, 
@@ -125,11 +119,6 @@ function gotRemoteStream(event){
   document.getElementById("remoteVideo").src = URL.createObjectURL(event.stream);
 }
 
-
-function btnHangupClick() {
-  localVideo.src = ""; localStream.stop(); localStream = null;
-  remoteVideo.src = ""; pc.close(); pc = null;
-}
 
 ////////////////////////////////////////////////
 // Socket.io
