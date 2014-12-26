@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style type="text/css">
+    html { height: 100%; }
+    body { height: 100%; margin: 0; background: #FFF; text-align: center; }
+    #remoteVideo { height: 70%; margin-top: 5%; background: #111; }
+    #localVideo { width: 20%; position: absolute; right: 1.1em; bottom: 1em; border: 1px solid #333; background: #111; }
+    #callButton { position: absolute; display: none; left: 50%; font-size: 2em; bottom: 5%; border-radius: 1em; }
+	#btnHangup { position: absolute; display: none; left: 60%; font-size: 2em; color: #F00; bottom: 5%; border-radius: 1em; }
+  </style>
+  <title>Видеочат</title>
+</head>
+<script src="/socket.io/socket.io.js"></script>
+
+<video id="localVideo" autoplay muted></video>
+<video id="remoteVideo" autoplay></video>
+<button id="callButton" onclick="createOffer()">✆</button>
+<button id="btnHangup" onclick="btnHangupClick()">✆</button>
+
+<script>
+var PeerConnection = window.mozRTCPeerConnection || window.webkitRTCPeerConnection;
+var IceCandidate = window.mozRTCIceCandidate || window.RTCIceCandidate;
+var SessionDescription = window.mozRTCSessionDescription || window.RTCSessionDescription;
+navigator.getUserMedia = navigator.getUserMedia || navigator.mozGetUserMedia || navigator.webkitGetUserMedia;
+
+var pc; // PeerConnection
+var localStream = null;
+var servers = { "iceServers": 
+[{url:'stun:stun01.sipphone.com'},
+{url:'stun:stun.ekiga.net'},
+{url:'stun:stun.fwdnet.net'},
+{url:'stun:stun.ideasip.com'},
+{url:'stun:stun.iptel.org'},
+{url:'stun:stun.rixtelecom.se'},
+{url:'stun:stun.schlund.de'},
+{url:'stun:stun.l.google.com:19302'},
+{url:'stun:stun1.l.google.com:19302'},
+{url:'stun:stun2.l.google.com:19302'},
+{url:'stun:stun3.l.google.com:19302'},
+{url:'stun:stun4.l.google.com:19302'},
+{url:'stun:stunserver.org'},
+{url:'stun:stun.softjoys.com'},
+{url:'stun:stun.voiparound.com'},
+{url:'stun:stun.voipbuster.com'},
+{url:'stun:stun.voipstunt.com'},
+{url:'stun:stun.voxgratia.org'},
+{url:'stun:stun.xten.com'},
+{
+    url: 'turn:numb.viagenie.ca',
+    credential: 'muazkh',
+    username: 'webrtc@live.com'
+},
+{
+    url: 'turn:192.158.29.39:3478?transport=udp',
+    credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+    username: '28224511:1379330808'
+},
+{
+    url: 'turn:192.158.29.39:3478?transport=tcp',
+    credential: 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+    username: '28224511:1379330808'
+}]};
+
+
+// Step 1. getUserMedia
+navigator.getUserMedia(
+  { audio: true, video: true }, 
+  gotStream, 
+  function(error) { console.log(error) }
+);
+
+function gotStream(stream) {
+  document.getElementById("callButton").style.display = 'inline-block';
+  document.getElementById("btnHangup").style.display = 'inline-block';
+  document.getElementById("localVideo").src = URL.createObjectURL(stream);
+
+  localStream = stream;
+  pc = new PeerConnection(null);
+  pc.addStream(stream);
+  pc.onicecandidate = gotIceCandidate;
+  pc.onaddstream = gotRemoteStream;
+}
+
+
+// Step 2. createOffer
+function createOffer() {
+	document.getElementById("localVideo").src = URL.createObjectURL(stream);
+  pc.createOffer(
+    gotLocalDescription, 
+    function(error) { console.log(error) }, 
+    { 'mandatory': { 'OfferToReceiveAudio': true, 'OfferToReceiveVideo': true } }
+  );
+}
+
+
+// Step 3. createAnswer
+function createAnswer() {
+  pc.createAnswer(
+    gotLocalDescription,
+    function(error) { console.log(error) }, 
+    { 'mandatory': { 'OfferToReceiveAudio': true, 'OfferToReceiveVideo': true } }
+  );
+}
+
+
+function gotLocalDescription(description){
+  pc.setLocalDescription(description);
+  sendMessage(description);
+}
+
+function gotIceCandidate(event){
+  if (event.candidate) {
+    sendMessage({
+      type: 'candidate',
+      label: event.candidate.sdpMLineIndex,
+      id: event.candidate.sdpMid,
+      candidate: event.candidate.candidate
+    });
+  }
+}
+
+function gotRemoteStream(event){
+  document.getElementById("remoteVideo").src = URL.createObjectURL(event.stream);
+}
+
+
+function btnHangupClick() {
+  localVideo.src = ""; localStream.stop(); localStream = null;
+  remoteVideo.src = ""; pc.close(); pc = null;
+}
+
+////////////////////////////////////////////////
+// Socket.io
+
+var socket = io.connect('', {port: 1234});
+
+function sendMessage(message){
+  socket.emit('message', message);
+}
+
+socket.on('message', function (message){
+  if (message.type === 'offer') {
+    pc.setRemoteDescription(new SessionDescription(message));
+    createAnswer();
+  } 
+  else if (message.type === 'answer') {
+    pc.setRemoteDescription(new SessionDescription(message));
+  } 
+  else if (message.type === 'candidate') {
+    var candidate = new IceCandidate({sdpMLineIndex: message.label, candidate: message.candidate});
+    pc.addIceCandidate(candidate);
+  }
+});
+
+</script>
+</html>
